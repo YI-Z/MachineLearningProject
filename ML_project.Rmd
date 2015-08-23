@@ -1,0 +1,85 @@
+---
+title: "MachineLearning_Project"
+author: "Yi Zhou"
+date: "August 20, 2015"
+output: html_document
+---
+
+## Summary
+This report analyzed the data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. From the training dataset, we built a machine learning algorithm that can predict the manner individuals perform exercises.
+
+## Data processing
+Read in the datasets and exploratory analysis on the datasets.
+```{r read_data, echo=TRUE, message=FALSE, cache=T}
+## Download files
+# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv", "curl")
+# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv", "curl")
+
+## Read in files
+training <- read.csv("pml-training.csv", header = T, stringsAsFactors = F)
+testing <- read.csv("pml-testing.csv", header = T, stringsAsFactors = F)
+```
+
+We noticed that there are a lot of missing information in the datasets. A simple solution for this is to just remove all these features.
+```{r extract_features, echo = T, message=F, cache=T}
+## This function helps to extract features from an inputing data frame
+extractFeatures <- function(data) {
+    require(dplyr)  
+    newdata <- select(data, roll_belt:total_accel_belt, 
+                      gyros_belt_x:total_accel_arm,
+                      gyros_arm_x:magnet_arm_z, roll_dumbbell:yaw_dumbbell,
+                      total_accel_dumbbell, gyros_dumbbell_x:yaw_forearm,
+                      total_accel_forearm, gyros_forearm_x:magnet_forearm_z)
+    return (newdata)
+}
+train <- extractFeatures(training)
+train$class <- as.factor(training$classe)
+
+test <- extractFeatures(testing)
+```
+
+## Training
+Here we built  machine learning algorithms on extracted features using  a random forest model.
+```{r train, echo = T, message=F, cache=T}
+set.seed(618818)
+## random forest algorithm and cross validation
+library(randomForest)
+## run a randomforest cross validation to determine how error changes
+## with the number of variables
+rfcv <- rfcv(trainx = train[,1:52], trainy = train$class, cv.fold = 3)
+with(rfcv, plot(n.var, error.cv, log="x", type="o", lwd=2))
+
+## run the prediction model with randomforest method
+fit.rf <- randomForest(class~., data = train, ntree = 100)
+fit.rf
+varImpPlot(fit.rf)
+
+```
+
+From the cross validation plot, we can see that cross-validation error decreases as varibale number increases. So we decided to use maxium number of variables to perform randomforest training.   
+Based on the statistics of the model, random forest machine learning algorithm gives an oob error less than 0.40%. This algorithm is quite robust and accurate.
+
+## Testing
+Using the randomforest model to predict test dataset.
+```{r test, echo = T, message = F}
+require(randomForest)
+answer <- predict(fit.rf, newdata = test)
+
+## write files
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answer)
+```
+
+## Conclusion
+Human activity could be properly predicted using the established random forest machine learning algorithms.
+
+
+
+
+
